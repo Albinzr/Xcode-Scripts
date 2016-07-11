@@ -1,0 +1,12 @@
+### OS X ###
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+
+### Thumbnails ###
+._*
+
+### External Disk Files ###
+.Spotlight-V100
+.Trashes
