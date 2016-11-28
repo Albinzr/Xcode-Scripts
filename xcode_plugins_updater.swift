@@ -137,7 +137,7 @@ enum Command {
   case xcodeBeta
   case xcodeWithPath(String)
   
-  enum Error: ErrorType {
+  enum ScriptError: Error {
     case xcodeInfoPlistNotFound(String)
     case xcodeInfoPlistReadFailed(String)
     case xcodePluginsNotFound(String)
@@ -146,13 +146,13 @@ enum Command {
   
   private struct Constants {
     
-    static let version                   = "1.0.1"
+    static let version                   = "1.0.2"
     static let scriptName                = "Xcode Plugins Updater"
     static let xcodeDefaultPath          = "/Applications/Xcode.app"
     static let xcodeBetaDefaultPath      = "/Applications/Xcode-beta.app"
     static let xcodeCompatibilityUUID    = "DVTPlugInCompatibilityUUID"
     static let pluginCompatibilityUUIDs  = "DVTPlugInCompatibilityUUIDs"
-    static let xcodePluginsDirectoryPath = ("~/Library/Application Support/Developer/Shared/Xcode/Plug-ins" as NSString).stringByExpandingTildeInPath
+    static let xcodePluginsDirectoryPath = ("~/Library/Application Support/Developer/Shared/Xcode/Plug-ins" as NSString).expandingTildeInPath
     
   }
   
@@ -174,11 +174,11 @@ enum Command {
       return .xcodeBeta
       
     case let a where a.hasPrefix("-xcp="):
-      let xcodePath = a.substringFromIndex(a.startIndex.advancedBy("-xcp=".characters.count))
+      let xcodePath = a.substring(from: a.index(a.startIndex, offsetBy: "-xcp=".characters.count))
       return xcodeWithPath(xcodePath)
       
     case let a where a.hasPrefix("--xcodepath="):
-      let xcodePath = a.substringFromIndex(a.startIndex.advancedBy("--xcodepath=".characters.count))
+      let xcodePath = a.substring(from: a.index(a.startIndex, offsetBy: "--xcodepath=".characters.count))
       return xcodeWithPath(xcodePath)
       
     default:
@@ -253,18 +253,18 @@ enum Command {
   /// Xcode info.plist
   static func infoPlistForXcode(at path: String) -> NSDictionary? {
     
-    let xcodeInfoPlistURL = NSURL(fileURLWithPath: path).URLByAppendingPathComponent("Contents/Info.plist")
-    return  NSDictionary(contentsOfURL: xcodeInfoPlistURL)
+    let xcodeInfoPlistURL = NSURL(fileURLWithPath: path).appendingPathComponent("Contents/Info.plist")
+    return  NSDictionary(contentsOf: xcodeInfoPlistURL!)
     
   }
   
   /// Xcode plugins URLs
-  static func getXcodePlugins() -> [NSURL]? {
+  static func getXcodePlugins() -> [URL]? {
     
     let pluginsDirectoryURL = NSURL(fileURLWithPath: Constants.xcodePluginsDirectoryPath)
-    let fileManager = NSFileManager.defaultManager()
+    let fileManager = FileManager.default
     guard
-      let pluginURLs = try? fileManager.contentsOfDirectoryAtURL(pluginsDirectoryURL, includingPropertiesForKeys: nil, options: [.SkipsSubdirectoryDescendants, .SkipsPackageDescendants]) else {
+      let pluginURLs = try? fileManager.contentsOfDirectory(at: pluginsDirectoryURL as URL, includingPropertiesForKeys: nil, options: [.skipsSubdirectoryDescendants, .skipsPackageDescendants]) else {
         return nil
     }
     let validPluginURLs = pluginURLs.filter{ $0.pathExtension == "xcplugin"}
@@ -277,11 +277,11 @@ enum Command {
     
     guard
       let info = infoPlistForXcode(at: path) else {
-        throw Error.xcodeInfoPlistNotFound("Info.plist not found for Xcode at \(path)")
+        throw ScriptError.xcodeInfoPlistNotFound("Info.plist not found for Xcode at \(path)")
     }
     
     guard let compatibilityUUIDValue = info[Constants.xcodeCompatibilityUUID] as? String else {
-      throw Error.xcodeInfoPlistReadFailed("Failed to read \(Constants.xcodeCompatibilityUUID) from Xcode Info.plist")
+      throw ScriptError.xcodeInfoPlistReadFailed("Failed to read \(Constants.xcodeCompatibilityUUID) from Xcode Info.plist")
     }
     
     print("\nUpdating plugins for Xcode at path \(path)...".bold)
@@ -290,19 +290,19 @@ enum Command {
     print("\n")
     
     guard let pluginURLs = getXcodePlugins() else {
-      throw Error.xcodePluginsNotFound("Plugins not found for Xcode at \(path)")
+      throw ScriptError.xcodePluginsNotFound("Plugins not found for Xcode at \(path)")
     }
     
     
     for pluginURL in pluginURLs {
       
-      guard let pluginName = (pluginURL.lastPathComponent as NSString?)?.stringByDeletingPathExtension else {
+      guard let pluginName = (pluginURL.lastPathComponent as NSString?)?.deletingPathExtension else {
         continue
       }
       
-      let pluginInfoPlistURL = pluginURL.URLByAppendingPathComponent("Contents/Info.plist")
+      let pluginInfoPlistURL = pluginURL.appendingPathComponent("Contents/Info.plist")
       
-      guard let pluginInfoPlist = NSMutableDictionary(contentsOfURL: pluginInfoPlistURL) else {
+      guard let pluginInfoPlist = NSMutableDictionary(contentsOf: pluginInfoPlistURL) else {
         let message = "⚠️ Failed to read Info.plist at \(pluginInfoPlistURL)".yellow
         print("\n\(message)")
         continue
@@ -329,10 +329,10 @@ enum Command {
       }
       
       guard
-        let infoPlistData = try? NSPropertyListSerialization.dataWithPropertyList(pluginInfoPlist, format: .XMLFormat_v1_0, options: 0),
-        let _ = try? infoPlistData.writeToURL(pluginInfoPlistURL, options: [.DataWritingAtomic])
+        let infoPlistData = try?  PropertyListSerialization.data(fromPropertyList: pluginInfoPlist, format: .xml, options: 0),
+        let _ = try?  infoPlistData.write(to: pluginInfoPlistURL, options: [.atomicWrite])
         else {
-          throw Error.xcodePluginInfoPlistWriteFailed("Info.plist not found for Xcode at \(pluginInfoPlistURL)")
+          throw ScriptError.xcodePluginInfoPlistWriteFailed("Info.plist not found for Xcode at \(pluginInfoPlistURL)")
       }
       
       print("‣ \(pluginName.green) ✅\n")
@@ -356,19 +356,19 @@ func main(arguments args: [String]) {
   
   do {
     
-    try Command.exec(command)
+    try Command.exec(command: command)
     exit(EXIT_SUCCESS)
     
-  } catch Command.Error.xcodeInfoPlistNotFound(let message) {
-     fail(with: message)
+  } catch Command.ScriptError.xcodeInfoPlistNotFound(let message) {
+    fail(with: message)
     
-  } catch Command.Error.xcodeInfoPlistReadFailed(let message) {
-     fail(with: message)
+  } catch Command.ScriptError.xcodeInfoPlistReadFailed(let message) {
+    fail(with: message)
     
-  } catch Command.Error.xcodePluginsNotFound(let message) {
-     fail(with: message)
+  } catch Command.ScriptError.xcodePluginsNotFound(let message) {
+    fail(with: message)
     
-  } catch Command.Error.xcodePluginInfoPlistWriteFailed(let message) {
+  } catch Command.ScriptError.xcodePluginInfoPlistWriteFailed(let message) {
     fail(with: message)
     
   } catch {
@@ -378,13 +378,11 @@ func main(arguments args: [String]) {
   
 }
 
-@noreturn func fail(with message: String) {
+func fail(with message: String) -> Never  {
   print("🚫 "+message.red+"\n")
   exit(EXIT_FAILURE)
 }
 
 // let's start
-main(arguments: Process.arguments)
-
-
+main(arguments: CommandLine.arguments)
 
