@@ -7,6 +7,8 @@
 # 3. Check "Run script only when installing" to run the script only when archiving.
 # Even before the project is compiled, Xcode copies the current .plist file to a build folder and uses that file to bundle the final archive when you are submitting to the App Store.
 
+set -x
+
 PLISTBUDDY="/usr/libexec/PlistBuddy"
 TARGET_BUILD_NUMBER=$($PLISTBUDDY -c "Print CFBundleVersion" "${TARGET_BUILD_DIR}/${INFOPLIST_PATH}")
 TIMESTAMP=$(date +%s)

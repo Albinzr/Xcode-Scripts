@@ -6,6 +6,8 @@
 # 2. Run this script before the 'Copy Bundle Resources' build phase.
 # 3. Check "Run script only when installing" to run the script only when archiving.
 
+set -x
+
 PLISTBUDDY="/usr/libexec/PlistBuddy"
 PROJECT_BUILD_NUMBER=$($PLISTBUDDY -c "Print :CFBundleVersion $buildNumber" "$INFOPLIST_FILE")
 

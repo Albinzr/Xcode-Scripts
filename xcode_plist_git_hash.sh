@@ -1,5 +1,7 @@
 # Get current git commit hash and save in the project .plist
 
+set -x
+
 PLISTBUDDY="/usr/libexec/PlistBuddy"
 GIT_HASH=$(git rev-parse --short HEAD)
 

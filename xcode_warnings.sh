@@ -4,6 +4,8 @@
 # Instructions:
 # 1. Add a new Run Script in Xcode Build Phases: "$SRCROOT/YOUR_SCRIPTS_FOLDER/xcode_warnings.sh" or "${SRCROOT}/Scripts/xcode_warnings.sh"
 
+set -x
+
 # List of tags to be reported as warnings
 TAGS="TODO:|FIXME:|WARNING:"
 
